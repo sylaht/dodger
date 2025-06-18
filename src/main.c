@@ -38,8 +38,26 @@ int kbhit() {
     return select(STDIN_FILENO+1, &set, NULL, NULL, &timeout) > 0;
 }
 
+void draw() {
+    system("clear");
+    printf("Score: %d\n", score);
+    for (int y = 0; y < HEIGHT; y++) {
+        for (int x = 0; x < WIDTH; x++) {
+            if (x == playerX && y == HEIGHT - 1) {
+                printf("%s", PLAYER_CHAR);
+            } else if (x == obstacleX && y == obstacleY) {
+                printf("%s", OBSTACLE_CHAR);
+            } else {
+                printf(" ");
+            }
+        }
+        printf("\n");
+    }
+}
+
 int main() {
     disable_input_buffering();
     atexit(reset_input_buffering);
+    draw();
     return 0;
 }
