@@ -7,14 +7,23 @@
 
 #define WIDTH 20
 #define HEIGHT 10
+#define MAX_OBSTACLES 5
 
-#define PLAYER_CHAR "🟦"
-#define OBSTACLE_CHAR "🟥"
+#define PLAYER_CHAR "🐍"
+#define OBSTACLE_CHAR "🪨"
+
+// Estrutura para representar um obstáculo
+typedef struct {
+    int x;
+    int y;
+    int active;  // 0 = inativo, 1 = ativo
+    int spawn_delay;  // delay para spawn do próximo obstáculo
+} Obstacle;
 
 int playerX = WIDTH / 5;
-int obstacleY = 0;
-int obstacleX;
 int score = 0;
+Obstacle obstacles[MAX_OBSTACLES];
+int obstacle_spawn_timer = 0;
 
 struct termios orig_termios;
 
@@ -42,6 +51,61 @@ int kbhit()
     return select(STDIN_FILENO + 1, &set, NULL, NULL, &timeout) > 0;
 }
 
+void init_obstacles()
+{
+    for (int i = 0; i < MAX_OBSTACLES; i++)
+    {
+        obstacles[i].x = rand() % WIDTH;
+        obstacles[i].y = -1;  // Começa fora da tela
+        obstacles[i].active = 0;
+        obstacles[i].spawn_delay = i * 15 + 10;  // Delay diferentes para cada obstáculo
+    }
+}
+
+void spawn_obstacle()
+{
+    for (int i = 0; i < MAX_OBSTACLES; i++)
+    {
+        if (!obstacles[i].active && obstacle_spawn_timer >= obstacles[i].spawn_delay)
+        {
+            obstacles[i].x = rand() % WIDTH;
+            obstacles[i].y = 0;
+            obstacles[i].active = 1;
+            obstacles[i].spawn_delay = obstacle_spawn_timer + 20 + rand() % 30;  // Próximo spawn em 20-50 frames
+            break;
+        }
+    }
+}
+
+void update_obstacles()
+{
+    for (int i = 0; i < MAX_OBSTACLES; i++)
+    {
+        if (obstacles[i].active)
+        {
+            obstacles[i].y++;
+            if (obstacles[i].y >= HEIGHT)
+            {
+                obstacles[i].active = 0;
+                obstacles[i].y = -1;
+                score++;
+            }
+        }
+    }
+}
+
+int check_collision()
+{
+    for (int i = 0; i < MAX_OBSTACLES; i++)
+    {
+        if (obstacles[i].active && obstacles[i].y == HEIGHT - 1 && obstacles[i].x == playerX)
+        {
+            return 1;  // Colisão detectada
+        }
+    }
+    return 0;  // Sem colisão
+}
+
 void draw()
 {
     system("clear");
@@ -54,13 +118,25 @@ void draw()
             {
                 printf("%s", PLAYER_CHAR);
             }
-            else if (x == obstacleX && y == obstacleY)
-            {
-                printf("%s", OBSTACLE_CHAR);
-            }
             else
             {
-                printf(" ");
+                int obstacle_here = 0;
+                for (int i = 0; i < MAX_OBSTACLES; i++)
+                {
+                    if (obstacles[i].active && x == obstacles[i].x && y == obstacles[i].y)
+                    {
+                        obstacle_here = 1;
+                        break;
+                    }
+                }
+                if (obstacle_here)
+                {
+                    printf("%s", OBSTACLE_CHAR);
+                }
+                else
+                {
+                    printf(" ");
+                }
             }
         }
         printf("\n");
@@ -77,9 +153,9 @@ void wait_for_enter()
 void reset_game()
 {
     playerX = WIDTH / 5;
-    obstacleY = 0;
-    obstacleX = rand() % WIDTH;
     score = 0;
+    obstacle_spawn_timer = 0;
+    init_obstacles();
 }
 
 int main()
@@ -94,7 +170,7 @@ int main()
 
         while (1)
         {
-            if (obstacleY == HEIGHT - 1 && obstacleX == playerX)
+            if (check_collision())
             {
                 draw();
                 printf("\n💀 Game Over! Score final: %d\n", score);
@@ -111,13 +187,9 @@ int main()
                     playerX++;
             }
 
-            obstacleY++;
-            if (obstacleY >= HEIGHT)
-            {
-                obstacleY = 0;
-                obstacleX = rand() % WIDTH;
-                score++;
-            }
+            obstacle_spawn_timer++;
+            spawn_obstacle();
+            update_obstacles();
 
             draw();
             usleep(100000);
